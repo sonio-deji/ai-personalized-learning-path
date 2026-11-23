@@ -110,6 +110,18 @@ stored attempts point to it.
 The 100 questions (10 per topic) are samples written in WAEC/JAMB style. They are not past questions and need
 review by a maths teacher before students see them.
 
+Every answer key is checked by `apps/api/prisma/questions.py`, which recomputes each correct
+answer independently and compares every question with `seed-data.ts`. It needs only Python 3.8+:
+
+```powershell
+python3 apps/api/prisma/questions.py           # verify all questions (exit code 1 on any problem)
+python3 apps/api/prisma/questions.py --emit    # print TypeScript for questions added there but not yet seeded
+```
+
+To add a question, add a `q(...)` entry with its check to `questions.py`, run `--emit`, paste the
+output into `seed-data.ts` after that topic's last question, and run the check again. A passing
+check proves the intended answer is right, not that every distractor is wrong, so read the options too.
+
 ## Changing the schema
 
 Needs Node 24 and a running Postgres.
