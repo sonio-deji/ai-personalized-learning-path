@@ -48,6 +48,8 @@ services:
       MODEL_URL: http://model:8000
       # Condition given to new participants: fixed or personalised. Week 8 adds random assignment.
       NEW_USER_CONDITION: ${NEW_USER_CONDITION:-fixed}
+      # Answers needed on a topic before the personalised path may skip it as mastered.
+      PERSONALISED_MIN_ANSWERS: ${PERSONALISED_MIN_ANSWERS:-2}
     ports:
       - "127.0.0.1:${API_PORT:-4000}:4000"
     depends_on:

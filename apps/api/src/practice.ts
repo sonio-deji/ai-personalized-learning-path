@@ -3,7 +3,7 @@ import { prisma } from "./db.js";
 import type { Condition } from "./generated/prisma/enums.js";
 import { bktTopics, bktUpdate, ModelUnavailableError, priorFor } from "./model.js";
 import { nextFixedQuestion } from "./policy/fixed.js";
-import { MASTERY_THRESHOLD, nextPersonalisedQuestion } from "./policy/personalised.js";
+import { DEFAULT_MIN_ANSWERS, MASTERY_THRESHOLD, nextPersonalisedQuestion } from "./policy/personalised.js";
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 type Db = typeof prisma | Tx;
@@ -11,6 +11,12 @@ type Db = typeof prisma | Tx;
 const perTopic = Number(process.env.FIXED_QUESTIONS_PER_TOPIC ?? 5);
 if (!Number.isInteger(perTopic) || perTopic < 1) {
   throw new Error("FIXED_QUESTIONS_PER_TOPIC must be a positive integer");
+}
+
+// Answers needed on a topic before the personalised path may skip it as mastered.
+const minAnswers = Number(process.env.PERSONALISED_MIN_ANSWERS ?? DEFAULT_MIN_ANSWERS);
+if (!Number.isInteger(minAnswers) || minAnswers < 0) {
+  throw new Error("PERSONALISED_MIN_ANSWERS must be a non-negative integer");
 }
 
 const newUserCondition = (process.env.NEW_USER_CONDITION ?? "fixed") as Condition;
@@ -45,7 +51,7 @@ async function currentQuestion(db: Db, userId: string, condition: Condition) {
 
   if (condition === "personalised") {
     const mastery = await masteryMap(db, userId, topics.map((t) => t.id));
-    const question = nextPersonalisedQuestion(topics, questions, attempted, mastery);
+    const question = nextPersonalisedQuestion(topics, questions, attempted, mastery, { minAnswers });
     // The length of a personalised path isn't known in advance.
     return { question, progress: { answered: attempts.length, total: null } };
   }

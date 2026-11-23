@@ -62,8 +62,10 @@ they first log in, from `NEW_USER_CONDITION` (week 8 replaces this with random a
 
 - `fixed` (default): topics in curriculum order, up to `FIXED_QUESTIONS_PER_TOPIC` questions
   each (default 5), easiest first.
-- `personalised`: the earliest topic not yet mastered (BKT p_known < 0.95), easiest unanswered
-  question first. Mastered topics are skipped; a topic that runs out of questions is left.
+- `personalised`: the earliest topic not yet mastered, easiest unanswered question first. A
+  topic counts as mastered when BKT p_known ≥ 0.95 **and** the student has answered at least
+  `PERSONALISED_MIN_ANSWERS` questions on it (default 2), so one lucky guess can't skip a topic.
+  Mastered topics are skipped; a topic that runs out of questions is left.
 
 To try the personalised path: `NEW_USER_CONDITION=personalised docker compose up -d`, then log in
 with a new code. The service status page is at http://localhost:3000/status.
