@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { api, type Feedback, type NextQuestion, type Progress } from "@/lib/api";
+import { api, type Feedback, type NextQuestion, type Progress, type TopicMastery } from "@/lib/api";
 import { getUserId } from "@/lib/session";
 import { submitAnswer } from "../actions";
 
@@ -16,7 +16,7 @@ export default async function Practice({ searchParams }: { searchParams: Search 
   // After an answer: show whether it was right, then a link on to the next question.
   if (attempt) {
     const res = await api<Feedback>(`/users/${userId}/attempts/${encodeURIComponent(attempt)}`);
-    if (res.ok) return <FeedbackView feedback={res.data} />;
+    if (res.ok) return <FeedbackView feedback={res.data} mastery={await getMastery(userId)} />;
     if (res.status === 404 || res.status === 400) redirect("/practice");
     return <Unavailable />;
   }
@@ -28,18 +28,22 @@ export default async function Practice({ searchParams }: { searchParams: Search 
   }
 
   const next = res.data;
+  const mastery = await getMastery(userId);
   if (next.done) {
     return (
-      <Shell progress={next.progress}>
+      <Shell progress={next.progress} mastery={mastery}>
         <h2>All done</h2>
-        <p>You have answered every question in this practice set. Thank you!</p>
+        <p>You have finished this practice set. Thank you!</p>
       </Shell>
     );
   }
 
   const { question } = next;
   return (
-    <Shell progress={next.progress}>
+    <Shell progress={next.progress} mastery={mastery}>
+      {error === "model_unavailable" && (
+        <p role="alert" className="error">Your answer could not be saved. Please submit it again.</p>
+      )}
       {error === "not_current_question" && (
         <p role="alert" className="error">That answer was already submitted. Here is your current question.</p>
       )}
@@ -67,10 +71,10 @@ export default async function Practice({ searchParams }: { searchParams: Search 
   );
 }
 
-function FeedbackView({ feedback }: { feedback: Feedback }) {
+function FeedbackView({ feedback, mastery }: { feedback: Feedback; mastery: TopicMastery[] | null }) {
   const { correct, question } = feedback;
   return (
-    <Shell>
+    <Shell mastery={mastery}>
       <p className="topic">{question.topic.name}</p>
       <p className="stem">{question.stem}</p>
       {correct ? (
@@ -95,17 +99,63 @@ function Unavailable() {
   );
 }
 
-function Shell({ progress, children }: { progress?: Progress; children: React.ReactNode }) {
+async function getMastery(userId: string) {
+  const res = await api<TopicMastery[]>(`/users/${userId}/mastery`);
+  return res.ok ? res.data : null; // the bars are optional; the page works without them
+}
+
+function progressLabel({ answered, total }: Progress) {
+  if (total === null) return `Question ${answered + 1}`;
+  return `Question ${Math.min(answered + 1, total)} of ${total}`;
+}
+
+function Shell({
+  progress,
+  mastery,
+  children,
+}: {
+  progress?: Progress;
+  mastery?: TopicMastery[] | null;
+  children: React.ReactNode;
+}) {
   return (
     <main>
       <header className="bar">
-        <span>{progress ? `Question ${Math.min(progress.answered + 1, progress.total)} of ${progress.total}` : ""}</span>
+        <span>{progress ? progressLabel(progress) : ""}</span>
         <form action="/logout" method="post">
           <button type="submit" className="link">Log out</button>
         </form>
       </header>
-      {progress && <progress value={progress.answered} max={progress.total} />}
+      {progress?.total != null && <progress value={progress.answered} max={progress.total} />}
       {children}
+      {mastery && <MasteryBars mastery={mastery} />}
     </main>
+  );
+}
+
+// Estimated mastery per topic from BKT. Shown to both conditions, so the only difference
+// between the groups is how the next question is chosen.
+function MasteryBars({ mastery }: { mastery: TopicMastery[] }) {
+  return (
+    <section className="mastery" aria-label="Your progress by topic">
+      <h2>Your topics</h2>
+      <ul>
+        {mastery.map((t) => {
+          const pct = Math.round(t.pKnown * 100);
+          return (
+            <li key={t.topicId}>
+              <span className="name">
+                {t.name}
+                {t.mastered && <span className="badge"> ✓ mastered</span>}
+              </span>
+              <span className="track" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                <span className={t.mastered ? "fill done" : "fill"} style={{ width: `${pct}%` }} />
+              </span>
+              <span className="pct">{pct}%</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

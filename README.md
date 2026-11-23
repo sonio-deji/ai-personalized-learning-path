@@ -57,9 +57,32 @@ hyphens; case doesn't matter). The first login with a new code needs the consent
 creates the participant. Later logins with the same code continue where they left off.
 
 Students then answer questions one at a time and see whether each answer was right before moving
-on. For now every participant gets the **fixed order**: topics in curriculum order, up to
-`FIXED_QUESTIONS_PER_TOPIC` questions each (default 5, set on the `api` service), easiest first.
-The service status page is at http://localhost:3000/status.
+on, with estimated mastery per topic shown underneath. A participant's condition is fixed when
+they first log in, from `NEW_USER_CONDITION` (week 8 replaces this with random assignment):
+
+- `fixed` (default): topics in curriculum order, up to `FIXED_QUESTIONS_PER_TOPIC` questions
+  each (default 5), easiest first.
+- `personalised`: the earliest topic not yet mastered (BKT p_known < 0.95), easiest unanswered
+  question first. Mastered topics are skipped; a topic that runs out of questions is left.
+
+To try the personalised path: `NEW_USER_CONDITION=personalised docker compose up -d`, then log in
+with a new code. The service status page is at http://localhost:3000/status.
+
+## Knowledge tracing (BKT)
+
+Every answer, in both conditions, goes through BKT in the model service. P(correct) predicted
+from earlier answers is stored in `attempts.p_bkt` before the student sees the result, and
+`mastery.p_known` is updated. If the model service is down, the answer is not stored and the
+student is asked to submit again.
+
+The model service reads two files from `ml/` at start-up:
+
+- `ml/artifacts/bkt_params.json`, exported by `ml/01_bkt_starter.ipynb`. Until it exists every
+  topic uses placeholder parameters, and `/health` on port 8000 says so.
+- `ml/topic_skill_map.csv`, the WAEC/JAMB topic → ASSISTments skill map (see
+  `ml/topic_skill_map.md`). A topic's parameters are the mean of its mapped skills' parameters.
+
+After changing either file, run `docker compose restart model`.
 
 The participant code is the only credential, so hand out codes that aren't easy to guess. The
 consent wording on the login page is a placeholder until the ethics-approved text is ready.
@@ -72,6 +95,8 @@ docker compose logs -f api
 docker compose down            # stop and keep the data
 docker compose down -v         # stop and DELETE the database
 npm test --workspace @plp/api  # unit tests (after npm ci)
+docker run --rm -v "$PWD/services/model:/srv" -w /srv python:3.13-slim-bookworm \
+  sh -c "pip install -q -r requirements-dev.txt && python -m pytest -p no:cacheprovider tests"   # model tests
 ```
 
 ## Questions

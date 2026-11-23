@@ -22,6 +22,14 @@ services:
 
   model:
     build: ../services/model
+    environment:
+      BKT_PARAMS_PATH: /ml/artifacts/bkt_params.json
+      TOPIC_SKILL_MAP_PATH: /ml/topic_skill_map.csv
+    # Trained parameters and the topic map are read from ml/ at start-up. Until
+    # ml/artifacts/bkt_params.json exists, every topic uses placeholder parameters.
+    # After replacing either file: docker compose restart model
+    volumes:
+      - ../ml:/ml:ro
     ports:
       - "127.0.0.1:${MODEL_PORT:-8000}:8000"
     healthcheck:
@@ -38,6 +46,8 @@ services:
     environment:
       DATABASE_URL: postgresql://plp:${POSTGRES_PASSWORD:-plp_dev_password}@postgres:5432/plp
       MODEL_URL: http://model:8000
+      # Condition given to new participants: fixed or personalised. Week 8 adds random assignment.
+      NEW_USER_CONDITION: ${NEW_USER_CONDITION:-fixed}
     ports:
       - "127.0.0.1:${API_PORT:-4000}:4000"
     depends_on:

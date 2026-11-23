@@ -37,6 +37,7 @@ export async function submitAnswer(formData: FormData) {
 
   if (res.ok) redirect(`/practice?attempt=${res.data.attemptId}`);
   if (res.error === "user_not_found") redirect("/logout");
+  // model_unavailable: nothing was stored, so the same question is shown again.
   // not_current_question: e.g. the form was resubmitted with the back button. Show the current one.
   redirect(`/practice?error=${encodeURIComponent(res.error)}`);
 }
