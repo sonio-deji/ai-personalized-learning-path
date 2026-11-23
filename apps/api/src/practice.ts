@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "./db.js";
 import type { Condition } from "./generated/prisma/enums.js";
-import { bktTopics, bktUpdate, ModelUnavailableError, priorFor } from "./model.js";
+import { bktTopics, bktUpdate, dktPredict, ModelUnavailableError, priorFor } from "./model.js";
 import { nextFixedQuestion } from "./policy/fixed.js";
 import { DEFAULT_MIN_ANSWERS, MASTERY_THRESHOLD, nextPersonalisedQuestion } from "./policy/personalised.js";
 
@@ -186,23 +186,34 @@ export function registerPracticeRoutes(app: FastifyInstance) {
         if (!(answer in options)) return reply.code(400).send({ error: "invalid_answer" });
         const correct = answer === question.answer;
 
-        // BKT runs for both conditions, so every attempt has a p_bkt for the AUC evaluation.
-        // p_correct is predicted from earlier answers only; it is stored with the attempt,
+        // BKT and DKT run for both conditions, so every attempt has p_bkt and p_dkt for the AUC
+        // evaluation. Both are predicted from earlier answers only and stored with the attempt,
         // inside this transaction, before the result goes back to the student. If the model
         // service is down this throws, the transaction rolls back and the student retries.
         const key = { userId_topicId: { userId, topicId: question.topicId } };
-        const current = await tx.mastery.findUnique({ where: key });
-        const bkt = await bktUpdate(question.topicId, current?.pKnown ?? null, correct);
+        const [current, history] = await Promise.all([
+          tx.mastery.findUnique({ where: key }),
+          // DKT reads the whole history. This attempt isn't stored yet, so it isn't included.
+          tx.attempt.findMany({
+            where: { userId },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: { correct: true, question: { select: { topicId: true } } },
+          }),
+        ]);
+        const [bkt, pDkt] = await Promise.all([
+          bktUpdate(question.topicId, current?.pKnown ?? null, correct),
+          // Prediction only: DKT doesn't choose questions. null if no DKT export is loaded.
+          dktPredict(history.map((h) => ({ topicId: h.question.topicId, correct: h.correct })), question.topicId),
+        ]);
 
         const attempt = await tx.attempt.create({
-          data: { userId, questionId, correct, responseTimeMs, pBkt: bkt.p_correct },
+          data: { userId, questionId, correct, responseTimeMs, pBkt: bkt.p_correct, pDkt },
         });
         await tx.mastery.upsert({
           where: key,
           create: { userId, topicId: question.topicId, pKnown: bkt.p_known },
           update: { pKnown: bkt.p_known },
         });
-        // Week 6-7: also store p_dkt here.
 
         return reply.code(201).send({ attemptId: attempt.id, correct });
       });

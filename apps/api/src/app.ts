@@ -13,12 +13,13 @@ async function databaseOk() {
   }
 }
 
-async function modelOk() {
+/** The model service's /health body, or null if it is unreachable. */
+async function modelHealth(): Promise<{ bkt?: string; dkt?: string | null } | null> {
   try {
     const res = await fetch(`${modelUrl}/health`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
+    return res.ok ? ((await res.json()) as { bkt?: string; dkt?: string | null }) : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -31,9 +32,11 @@ export function buildApp() {
     return reply.code(database ? 200 : 503).send({ status: database ? "ok" : "error" });
   });
 
+  // For people, not health checks. bkt/dkt say which trained models are loaded:
+  // check before each pilot session that dkt is not null, or p_dkt isn't being recorded.
   app.get("/status", async () => {
-    const [database, model] = await Promise.all([databaseOk(), modelOk()]);
-    return { database, model };
+    const [database, health] = await Promise.all([databaseOk(), modelHealth()]);
+    return { database, model: health !== null, bkt: health?.bkt ?? null, dkt: health?.dkt ?? null };
   });
 
   app.get("/topics", async () => {

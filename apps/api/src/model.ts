@@ -26,6 +26,31 @@ export function bktUpdate(topicId: string, pKnown: number | null, correct: boole
   });
 }
 
+/**
+ * P(correct) from DKT for the next question on `topicId`, given the student's earlier answers
+ * (oldest first, not including the one being predicted). null when the model service has no
+ * DKT export loaded; any other failure throws, like BKT.
+ */
+export async function dktPredict(history: { topicId: string; correct: boolean }[], topicId: string) {
+  let res: Response;
+  try {
+    res = await fetch(`${modelUrl}/dkt/predict`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        topic_id: topicId,
+        history: history.map((h) => ({ topic_id: h.topicId, correct: h.correct })),
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch (err) {
+    throw new ModelUnavailableError(`model service unreachable: ${String(err)}`);
+  }
+  if (res.status === 503) return null; // no DKT export loaded
+  if (!res.ok) throw new ModelUnavailableError(`model service /dkt/predict returned ${res.status}`);
+  return ((await res.json()) as { p_correct: number }).p_correct;
+}
+
 type Prior = { prior: number };
 export type BktTopics = { default: Prior; topics: Record<string, Prior>; mastery_threshold: number };
 

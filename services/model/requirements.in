@@ -1,3 +1,5 @@
 # Direct dependencies. requirements.txt is the pinned, resolved list that Docker installs.
 fastapi==0.165.0
 uvicorn==0.54.0
+onnxruntime==1.32.0
+numpy==2.5.5

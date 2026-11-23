@@ -14,12 +14,13 @@ belief with Bayes' rule given the actual answer, then (3) allow for learning.
 
 from __future__ import annotations
 
-import csv
 import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from statistics import mean
+
+from .topic_map import read_topic_map
 
 log = logging.getLogger(__name__)
 
@@ -106,14 +107,10 @@ def load_model(params_path: Path, topic_map_path: Path) -> BktModel:
         trained_on=str(raw.get("trained_on", "unknown")),
     )
 
-    if not topic_map_path.exists():
+    mapped = read_topic_map(topic_map_path)
+    if not mapped:
         log.warning("No topic-skill map at %s: every topic uses the default parameters", topic_map_path)
         return model
-
-    mapped: dict[str, list[str]] = {}
-    with topic_map_path.open(newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            mapped.setdefault(row["topic_id"].strip(), []).append(row["skill_name"].strip())
 
     for topic_id, names in mapped.items():
         used = tuple(n for n in names if n in skills)

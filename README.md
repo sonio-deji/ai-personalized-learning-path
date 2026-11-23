@@ -86,6 +86,26 @@ The model service reads two files from `ml/` at start-up:
 
 After changing either file, run `docker compose restart model`.
 
+## Knowledge tracing (DKT)
+
+DKT (an LSTM, `ml/03_dkt.ipynb`) only **predicts**: on every answer the API sends the student's
+earlier answers to `POST /dkt/predict` and stores the result in `attempts.p_dkt`, before the
+student sees whether they were right. It does not choose questions; BKT drives the
+personalised path (notebook 03 explains why DKT's output is not a mastery estimate).
+
+The model service loads `ml/artifacts/dkt/` (`dkt.onnx` + `dkt_meta.json`, exported by notebook
+03) at start-up and refuses to start if the files don't match their checksum or test vectors.
+Topics are translated through `ml/topic_skill_map.csv`:
+
+- input: each answer is one event for the topic's first mapped skill that DKT knows;
+- output: the mean P(correct) over the topic's mapped skills that DKT knows;
+- topics with no known skill (currently Number Bases and Sequences and Series) are left out of
+  the input and get the mean over all skills, so their `p_dkt` hardly varies: analyse them
+  separately. `GET /dkt/topics` on port 8000 shows the translation.
+
+Without an export the app still works and stores `p_dkt` as null. **Before each pilot session,
+check http://localhost:3000/status (or `/status` on the API) shows DKT as loaded.**
+
 The participant code is the only credential, so hand out codes that aren't easy to guess. The
 consent wording on the login page is a placeholder until the ethics-approved text is ready.
 
@@ -97,7 +117,8 @@ docker compose logs -f api
 docker compose down            # stop and keep the data
 docker compose down -v         # stop and DELETE the database
 npm test --workspace @plp/api  # unit tests (after npm ci)
-docker run --rm -v "$PWD/services/model:/srv" -w /srv python:3.13-slim-bookworm \
+docker run --rm -v "$PWD/services/model:/srv" -w /srv \
+  -e DKT_TEST_DIR=/dkt -v "$PWD/ml/artifacts/dkt:/dkt:ro" python:3.13-slim-bookworm \
   sh -c "pip install -q -r requirements-dev.txt && python -m pytest -p no:cacheprovider tests"   # model tests
 ```
 

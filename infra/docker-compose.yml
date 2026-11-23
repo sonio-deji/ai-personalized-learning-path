@@ -25,8 +25,10 @@ services:
     environment:
       BKT_PARAMS_PATH: /ml/artifacts/bkt_params.json
       TOPIC_SKILL_MAP_PATH: /ml/topic_skill_map.csv
-    # Trained parameters and the topic map are read from ml/ at start-up. Until
-    # ml/artifacts/bkt_params.json exists, every topic uses placeholder parameters.
+      DKT_DIR: /ml/artifacts/dkt
+    # Trained models and the topic map are read from ml/ at start-up. Until
+    # ml/artifacts/bkt_params.json exists, every topic uses placeholder BKT parameters;
+    # until ml/artifacts/dkt/ exists (notebook 03), DKT is off and p_dkt is stored as null.
     # After replacing either file: docker compose restart model
     volumes:
       - ../ml:/ml:ro

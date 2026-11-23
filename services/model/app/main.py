@@ -1,27 +1,37 @@
 """Model service: predicts mastery per topic, and nothing else.
 
-The Node API owns the next-question policy. POST /dkt/predict arrives in weeks 6-7.
+The Node API owns the next-question policy. BKT predicts and tracks mastery; DKT only
+predicts P(correct), which the API stores for the AUC comparison.
 """
 
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from . import bkt
+from . import bkt, dkt
 
 PARAMS_PATH = Path(os.environ.get("BKT_PARAMS_PATH", "/ml/artifacts/bkt_params.json"))
 TOPIC_MAP_PATH = Path(os.environ.get("TOPIC_SKILL_MAP_PATH", "/ml/topic_skill_map.csv"))
+DKT_DIR = Path(os.environ.get("DKT_DIR", "/ml/artifacts/dkt"))
 
 app = FastAPI(title="Knowledge tracing model service")
 # Loaded once at start-up. Restart the service after replacing the files.
 app.state.bkt = bkt.load_model(PARAMS_PATH, TOPIC_MAP_PATH)
+# None if there is no export yet; a broken export raises here, so the service fails to start.
+app.state.dkt = dkt.load_dkt(DKT_DIR, TOPIC_MAP_PATH)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "bkt": app.state.bkt.trained_on}
+def health() -> dict[str, str | None]:
+    model: dkt.DktModel | None = app.state.dkt
+    return {
+        "status": "ok",
+        "bkt": app.state.bkt.trained_on,
+        # null when no DKT export is loaded; the API then stores p_dkt as null.
+        "dkt": f"{model.trained_on} ({model.version})" if model else None,
+    }
 
 
 @app.get("/bkt/topics")
@@ -67,3 +77,43 @@ def bkt_update(req: UpdateRequest) -> UpdateResponse:
         mastered=p_next >= bkt.MASTERY_THRESHOLD,
         source=tp.source,
     )
+
+
+class Answer(BaseModel):
+    topic_id: str = Field(min_length=1)
+    correct: bool
+
+
+class DktRequest(BaseModel):
+    # The student's answers so far, oldest first, NOT including the one being predicted.
+    history: list[Answer] = Field(default_factory=list, max_length=5000)
+    topic_id: str = Field(min_length=1)  # topic of the question about to be answered
+
+
+class DktResponse(BaseModel):
+    topic_id: str
+    p_correct: float  # stored by the API as attempts.p_dkt
+    source: str  # "skills" or "default"
+    version: str
+    history_used: int
+    history_skipped: int
+
+
+@app.post("/dkt/predict")
+def dkt_predict(req: DktRequest) -> DktResponse:
+    model: dkt.DktModel | None = app.state.dkt
+    if model is None:
+        raise HTTPException(status_code=503, detail="dkt_not_loaded")
+    pred = model.predict_topic([(a.topic_id, int(a.correct)) for a in req.history], req.topic_id)
+    return DktResponse(topic_id=req.topic_id, p_correct=pred.p_correct, source=pred.source,
+                       version=model.version, history_used=pred.history_used,
+                       history_skipped=pred.history_skipped)
+
+
+@app.get("/dkt/topics")
+def dkt_topics() -> dict:
+    """How each topic is translated: its input skill and the skills averaged for output."""
+    model: dkt.DktModel | None = app.state.dkt
+    if model is None:
+        raise HTTPException(status_code=503, detail="dkt_not_loaded")
+    return {"version": model.version, "trained_on": model.trained_on, "topics": model.topics_json()}

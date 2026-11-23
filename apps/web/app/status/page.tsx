@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 const apiUrl = process.env.API_URL ?? "http://127.0.0.1:4000";
 
-type Status = { database: boolean; model: boolean };
+type Status = { database: boolean; model: boolean; bkt: string | null; dkt: string | null };
 type Topic = { id: string; name: string; curriculumOrder: number; questionCount: number };
 
 async function getFromApi<T>(path: string): Promise<T | null> {
@@ -39,6 +39,12 @@ export default async function Home() {
           <li key={name}>{`${name}: ${ok ? "up" : "unavailable"}`}</li>
         ))}
       </ul>
+      {status?.model && (
+        <ul>
+          <li>{`BKT parameters: ${status.bkt ?? "unknown"}`}</li>
+          <li>{`DKT: ${status.dkt ?? "not loaded (p_dkt is not being recorded)"}`}</li>
+        </ul>
+      )}
 
       <h2>Topics</h2>
       {topics ? (
