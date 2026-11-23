@@ -1,0 +1,11 @@
+{
+  "name": "personalized-learning-path",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "overrides": { "effect": "3.22.5" },
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  }
+}

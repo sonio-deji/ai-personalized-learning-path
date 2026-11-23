@@ -1,0 +1,124 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Range checks (probabilities, difficulty, SUS responses) are hand-written at the end
+// of the init migration, because Prisma's schema language can't express them.
+
+enum Condition {
+  personalised
+  fixed
+}
+
+enum TestKind {
+  pre
+  post
+}
+
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  condition Condition // assigned by the API, so deliberately no default
+  consent   Boolean   @default(false)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  attempts     Attempt[]
+  mastery      Mastery[]
+  tests        Test[]
+  susResponses SusResponse[]
+
+  @@map("users")
+}
+
+model Topic {
+  id              String @id // readable slug, also usable in ml/topic_skill_map.csv
+  name            String @unique
+  curriculumOrder Int    @unique @map("curriculum_order")
+
+  questions Question[]
+  mastery   Mastery[]
+
+  @@map("topics")
+}
+
+model Question {
+  id         String @id // stable slug, so seeding can be repeated
+  topicId    String @map("topic_id")
+  stem       String
+  options    Json // { "A": "...", "B": "...", "C": "...", "D": "..." }
+  answer     String // an option key. Never send this to the student before they answer.
+  source     String
+  difficulty Int // 1 easy, 2 medium, 3 hard
+
+  topic    Topic     @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  attempts Attempt[]
+
+  @@index([topicId])
+  @@map("questions")
+}
+
+model Attempt {
+  id             Int      @id @default(autoincrement())
+  userId         String   @map("user_id") @db.Uuid
+  questionId     String   @map("question_id")
+  correct        Boolean
+  responseTimeMs Int      @map("response_time_ms")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  // P(correct) predicted from earlier attempts only, stored before feedback is shown.
+  // These feed the AUC evaluation. Nullable until each model is being served.
+  pBkt Float? @map("p_bkt")
+  pDkt Float? @map("p_dkt")
+
+  // Restrict, not cascade: attempts are research data.
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt]) // DKT reads a student's whole history on every call
+  @@index([questionId])
+  @@map("attempts")
+}
+
+model Mastery {
+  userId    String   @map("user_id") @db.Uuid
+  topicId   String   @map("topic_id")
+  pKnown    Float    @map("p_known")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Restrict)
+
+  @@id([userId, topicId])
+  @@map("mastery")
+}
+
+model Test {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id") @db.Uuid
+  kind      TestKind
+  items     Json // the items shown, with the student's responses
+  score     Float? // null until submitted
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, kind])
+  @@map("tests")
+}
+
+model SusResponse {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique @map("user_id") @db.Uuid
+  responses Int[] // the ten SUS items in order, each 1 to 5
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("sus_responses")
+}

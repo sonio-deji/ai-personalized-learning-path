@@ -1,0 +1,6 @@
+# Lets `docker compose up` work from the repository root.
+# The name is repeated here because an included file's name is ignored. Without it,
+# starting from the root and from infra/ would create two separate database volumes.
+name: plp
+include:
+  - infra/docker-compose.yml
