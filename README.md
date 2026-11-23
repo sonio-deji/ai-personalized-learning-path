@@ -47,7 +47,7 @@ docker compose up -d --wait
 docker compose exec postgres psql -U plp -d plp -c "select count(*) from questions"
 ```
 
-Expect four healthy services, `{"database":true,"model":true}`, and a count of 20 both times.
+Expect four healthy services, `{"database":true,"model":true}`, and a count of 100 both times.
 If something fails, run `docker compose logs api` (or the name of the failing service).
 
 ## Using the app
@@ -107,7 +107,7 @@ docker run --rm -v "$PWD/services/model:/srv" -w /srv python:3.13-slim-bookworm 
 edits there and not in the database. Don't reuse a question ID for a different question, because
 stored attempts point to it.
 
-The 20 questions are samples written in WAEC/JAMB style. They are not past questions and need
+The 100 questions (10 per topic) are samples written in WAEC/JAMB style. They are not past questions and need
 review by a maths teacher before students see them.
 
 ## Changing the schema
