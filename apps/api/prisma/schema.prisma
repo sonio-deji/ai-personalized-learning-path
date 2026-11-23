@@ -24,6 +24,9 @@ enum TestKind {
 
 model User {
   id        String    @id @default(uuid()) @db.Uuid
+  // Participant code the student logs in with (e.g. P017). Stored upper-case.
+  // It is the only credential, so keep codes unguessable enough for the pilot.
+  code      String    @unique
   condition Condition // assigned by the API, so deliberately no default
   consent   Boolean   @default(false)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)

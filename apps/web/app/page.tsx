@@ -1,68 +1,47 @@
-// Week 3 placeholder showing that the stack is wired up. Week 4 replaces it with login.
+import { redirect } from "next/navigation";
+import { getUserId } from "@/lib/session";
+import { login } from "./actions";
 
-// Render per request: API_URL is only known when the container runs.
 export const dynamic = "force-dynamic";
 
-const apiUrl = process.env.API_URL ?? "http://127.0.0.1:4000";
+const ERRORS: Record<string, string> = {
+  invalid_code: "Enter your participant code: 3 to 20 letters, digits or hyphens (for example P017).",
+  consent_required: "This is a new participant code. Please read and tick the consent box to begin.",
+  api_unreachable: "The server is not responding. Please try again in a moment.",
+};
 
-type Status = { database: boolean; model: boolean };
-type Topic = { id: string; name: string; curriculumOrder: number; questionCount: number };
-
-async function getFromApi<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${apiUrl}${path}`, { cache: "no-store", signal: AbortSignal.timeout(6000) });
-    return res.ok ? ((await res.json()) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-export default async function Home() {
-  const [status, topics] = await Promise.all([
-    getFromApi<Status>("/status"),
-    getFromApi<Topic[]>("/topics"),
-  ]);
-
-  const services = [
-    ["API", status !== null],
-    ["Database", status?.database],
-    ["Model service", status?.model],
-  ] as const;
+export default async function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  if (await getUserId()) redirect("/practice");
+  const { error } = await searchParams;
 
   return (
     <main>
-      <h1>WAEC/JAMB Maths Learning Path</h1>
+      <h1>WAEC/JAMB Maths Practice</h1>
 
-      <h2>Services</h2>
-      <ul>
-        {services.map(([name, ok]) => (
-          <li key={name}>{`${name}: ${ok ? "up" : "unavailable"}`}</li>
-        ))}
-      </ul>
-
-      <h2>Topics</h2>
-      {topics ? (
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Topic</th>
-              <th>Questions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topics.map((topic) => (
-              <tr key={topic.id}>
-                <td>{topic.curriculumOrder}</td>
-                <td>{topic.name}</td>
-                <td>{topic.questionCount}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p>Could not load topics.</p>
+      {error && (
+        <p role="alert" className="error">
+          {ERRORS[error] ?? "Something went wrong. Please try again."}
+        </p>
       )}
+
+      <form action={login} className="stack">
+        <label>
+          Participant code
+          <input name="code" required autoComplete="off" autoCapitalize="characters" placeholder="e.g. P017" />
+        </label>
+
+        {/* Placeholder wording: replace with the ethics-approved consent text before the pilot. */}
+        <label className="check">
+          <input type="checkbox" name="consent" />
+          <span>
+            I am 18 or older. I agree that my answers and response times are recorded,
+            without my name, for a research study on personalised maths practice.
+            (Only needed the first time you log in.)
+          </span>
+        </label>
+
+        <button type="submit">Start</button>
+      </form>
     </main>
   );
 }

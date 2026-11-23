@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { prisma } from "./db.js";
+import { registerPracticeRoutes } from "./practice.js";
 
 const modelUrl = process.env.MODEL_URL ?? "http://127.0.0.1:8000";
 
@@ -42,6 +43,8 @@ export function buildApp() {
     });
     return topics.map(({ _count, ...topic }) => ({ ...topic, questionCount: _count.questions }));
   });
+
+  registerPracticeRoutes(app);
 
   app.addHook("onClose", () => prisma.$disconnect());
   return app;

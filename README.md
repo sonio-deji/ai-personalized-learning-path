@@ -3,10 +3,6 @@
 A web app, API and knowledge-tracing model service. [CLAUDE.md](CLAUDE.md) describes the research
 design and build plan.
 
-> **Not yet verified:** the stack has not been started with Docker, and the migration and seed
-> have not been run against PostgreSQL. Work through [Check a first start](#check-a-first-start),
-> then delete this note.
-
 ## Requirements
 
 Docker with Compose 2.20 or newer. On Windows, in PowerShell as Administrator:
@@ -54,6 +50,20 @@ docker compose exec postgres psql -U plp -d plp -c "select count(*) from questio
 Expect four healthy services, `{"database":true,"model":true}`, and a count of 20 both times.
 If something fails, run `docker compose logs api` (or the name of the failing service).
 
+## Using the app
+
+Open http://localhost:3000 and enter a participant code such as `P017` (3 to 20 letters, digits or
+hyphens; case doesn't matter). The first login with a new code needs the consent box ticked and
+creates the participant. Later logins with the same code continue where they left off.
+
+Students then answer questions one at a time and see whether each answer was right before moving
+on. For now every participant gets the **fixed order**: topics in curriculum order, up to
+`FIXED_QUESTIONS_PER_TOPIC` questions each (default 5, set on the `api` service), easiest first.
+The service status page is at http://localhost:3000/status.
+
+The participant code is the only credential, so hand out codes that aren't easy to guess. The
+consent wording on the login page is a placeholder until the ethics-approved text is ready.
+
 ## Everyday commands
 
 ```powershell
@@ -61,6 +71,7 @@ docker compose up --build -d   # rebuild after a code change (there is no hot re
 docker compose logs -f api
 docker compose down            # stop and keep the data
 docker compose down -v         # stop and DELETE the database
+npm test --workspace @plp/api  # unit tests (after npm ci)
 ```
 
 ## Questions
