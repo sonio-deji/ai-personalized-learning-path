@@ -48,8 +48,9 @@ services:
     environment:
       DATABASE_URL: postgresql://plp:${POSTGRES_PASSWORD:-plp_dev_password}@postgres:5432/plp
       MODEL_URL: http://model:8000
-      # Condition given to new participants: fixed or personalised. Week 8 adds random assignment.
-      NEW_USER_CONDITION: ${NEW_USER_CONDITION:-fixed}
+      # Condition for new participants: random (balanced blocks of 4, for the pilot), or
+      # fixed / personalised to force one while developing.
+      NEW_USER_CONDITION: ${NEW_USER_CONDITION:-random}
       # Answers needed on a topic before the personalised path may skip it as mastered.
       PERSONALISED_MIN_ANSWERS: ${PERSONALISED_MIN_ANSWERS:-2}
     ports:

@@ -47,7 +47,7 @@ docker compose up -d --wait
 docker compose exec postgres psql -U plp -d plp -c "select count(*) from questions"
 ```
 
-Expect four healthy services, `{"database":true,"model":true}`, and a count of 100 both times.
+Expect four healthy services, `{"database":true,"model":true}`, and a count of 120 (100 practice + 20 test) both times.
 If something fails, run `docker compose logs api` (or the name of the failing service).
 
 ## Using the app
@@ -56,19 +56,56 @@ Open http://localhost:3000 and enter a participant code such as `P017` (3 to 20 
 hyphens; case doesn't matter). The first login with a new code needs the consent box ticked and
 creates the participant. Later logins with the same code continue where they left off.
 
-Students then answer questions one at a time and see whether each answer was right before moving
-on, with estimated mastery per topic shown underneath. A participant's condition is fixed when
-they first log in, from `NEW_USER_CONDITION` (week 8 replaces this with random assignment):
+Each participant goes through the study in this order; the home page always sends them to their
+current step, and the API refuses steps out of order:
 
-- `fixed` (default): topics in curriculum order, up to `FIXED_QUESTIONS_PER_TOPIC` questions
-  each (default 5), easiest first.
+1. **Pre-test**: 20 items (2 per topic, `testQuestions` in `seed-data.ts`), no feedback.
+2. **Practice**: one question at a time with feedback and mastery bars, under their condition.
+3. **Post-test**: the same 20 items, opened as soon as the participant's practice set ends.
+4. **SUS survey**: the ten standard System Usability Scale statements ("system" → "app").
+
+The test items are never used in practice, so the tests measure learning rather than memory of
+practice questions.
+
+### Conditions
+
+A participant's condition is set when they first log in, from `NEW_USER_CONDITION`:
+
+- `random` (default, for the pilot): permuted blocks of 4, so every 4 sign-ups contain 2 of each
+  condition in random order, and the groups never differ by more than 2.
+- `fixed` / `personalised`: force one condition while developing, e.g.
+  `NEW_USER_CONDITION=personalised docker compose up -d`, then log in with a new code.
+
+What the conditions do in practice:
+
+- `fixed`: topics in curriculum order, up to `FIXED_QUESTIONS_PER_TOPIC` questions each
+  (default 5), easiest first.
 - `personalised`: the earliest topic not yet mastered, easiest unanswered question first. A
   topic counts as mastered when BKT p_known ≥ 0.95 **and** the student has answered at least
   `PERSONALISED_MIN_ANSWERS` questions on it (default 2), so one lucky guess can't skip a topic.
   Mastered topics are skipped; a topic that runs out of questions is left.
 
-To try the personalised path: `NEW_USER_CONDITION=personalised docker compose up -d`, then log in
-with a new code. The service status page is at http://localhost:3000/status.
+Because the post-test opens when practice ends, personalised participants (whose path is
+usually shorter) tend to sit it after fewer questions than fixed-order ones. Record and report
+the number of practice answers per participant (`attempts.csv`) alongside the test gains.
+
+The service status page is at http://localhost:3000/status.
+
+### Exporting the data
+
+Each table is written as CSV to stdout. Participant codes are not included; rows link by `user_id`.
+
+```bash
+for t in participants attempts tests sus; do
+  docker compose exec -T api node dist/src/scripts/export.js $t > $t.csv
+done
+```
+
+- `participants.csv`: condition, consent, sign-up time.
+- `attempts.csv`: one row per practice answer, in order, with `p_bkt` and `p_dkt` (predicted before
+  the answer), response time, topic and difficulty.
+- `tests.csv`: one row per test item per test (long format), with the test score and duration.
+- `sus.csv`: the ten responses and the SUS score (0–100).
 
 ## Knowledge tracing (BKT)
 
@@ -128,7 +165,7 @@ docker run --rm -v "$PWD/services/model:/srv" -w /srv \
 edits there and not in the database. Don't reuse a question ID for a different question, because
 stored attempts point to it.
 
-The 100 questions (10 per topic) are samples written in WAEC/JAMB style. They are not past questions and need
+The 100 practice questions (10 per topic) and 20 test items are samples written in WAEC/JAMB style. They are not past questions and need
 review by a maths teacher before students see them.
 
 Every answer key is checked by `apps/api/prisma/questions.py`, which recomputes each correct

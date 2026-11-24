@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { api, type Feedback, type NextQuestion, type Progress, type TopicMastery } from "@/lib/api";
 import { getUserId } from "@/lib/session";
+import { requireStage } from "@/lib/stage";
 import { submitAnswer } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -21,22 +22,19 @@ export default async function Practice({ searchParams }: { searchParams: Search 
     return <Unavailable />;
   }
 
+  // Practice is only open after the pre-test; once it's finished, the post-test follows.
+  await requireStage(userId, ["practice"]);
+
   const res = await api<NextQuestion>(`/users/${userId}/next-question`);
   if (!res.ok) {
     if (res.error === "user_not_found" || res.status === 400) redirect("/logout");
+    if (res.error === "pre_test_required") redirect("/test");
     return <Unavailable />;
   }
 
   const next = res.data;
+  if (next.done) redirect("/"); // practice finished: on to the post-test
   const mastery = await getMastery(userId);
-  if (next.done) {
-    return (
-      <Shell progress={next.progress} mastery={mastery}>
-        <h2>All done</h2>
-        <p>You have finished this practice set. Thank you!</p>
-      </Shell>
-    );
-  }
 
   const { question } = next;
   return (

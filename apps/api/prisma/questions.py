@@ -298,6 +298,71 @@ q(f"{T}-09", T, 3, "Find the variance of 2, 4, 6 and 8.",
 q(f"{T}-10", T, 3, "In how many ways can 3 prefects be chosen from 8 students?",
   ["56", "336", "24", "11"], lambda: str(len(list(combinations(range(8), 3)))))
 
+# ================ Pre/post-test items (testQuestions in seed-data.ts) =======================
+# Used only in the pre- and post-test (the same 20 both times), never in practice.
+
+T = "number-bases"
+q(f"test-{T}-1", T, 2, "Convert 1011011₂ to base ten.",
+  ["91", "93", "45", "182"], lambda: str(from_base("1011011", 2)))
+q(f"test-{T}-2", T, 3, "Find n if 31ₙ = 25 (base ten).",
+  ["8", "7", "6", "9"], lambda: str(next(n for n in range(4, 17) if 3 * n + 1 == 25)))
+
+T = "fractions-percentages"
+q(f"test-{T}-1", T, 2, "A shirt marked ₦6,000 is sold at a discount of 15%. Find the selling price.",
+  ["₦5,100", "₦900", "₦5,850", "₦6,900"], lambda: f"₦{6000 * 85 // 100:,}")
+q(f"test-{T}-2", T, 3, "Musa and Ngozi share a sum of money in the ratio 5 : 3. Musa gets ₦1,200 more than Ngozi. Find the sum shared.",
+  ["₦4,800", "₦3,000", "₦1,800", "₦9,600"], lambda: f"₦{1200 // (5 - 3) * (5 + 3):,}")
+
+T = "indices-logs-surds"
+q(f"test-{T}-1", T, 2, "Simplify (8^(1/3) × 16^(1/2)) ÷ 2³.",
+  ["1", "2", "1/2", "4"], lambda: str(round(8 ** (1 / 3) * 16 ** 0.5 / 2 ** 3)))
+q(f"test-{T}-2", T, 3, "Solve log₂(x + 3) = 4.",
+  ["13", "5", "1", "61"], lambda: str(next(x for x in range(-2, 100) if math.isclose(math.log2(x + 3), 4))))
+
+T = "sets"
+q(f"test-{T}-1", T, 2, "In a class, 18 students offer French, 22 offer Igbo, 7 offer both and 5 offer neither. How many students are in the class?",
+  ["38", "52", "45", "33"], lambda: str(18 + 22 - 7 + 5))
+q(f"test-{T}-2", T, 3, "If n(U) = 50, n(A) = 30, n(B) = 25 and n(A ∩ B) = 12, find n(A′ ∩ B′).",
+  ["7", "12", "43", "5"], lambda: str(50 - (30 + 25 - 12)))
+
+T = "linear-equations"
+q(f"test-{T}-1", T, 2, "Solve 4(x − 2) − 3(x + 1) = 5.",
+  ["16", "6", "−6", "4"], lambda: str(next(x for x in range(-50, 51) if 4 * (x - 2) - 3 * (x + 1) == 5)))
+q(f"test-{T}-2", T, 3, "Solve the simultaneous equations 2x + y = 7 and x − 2y = −4.",
+  ["x = 2, y = 3", "x = 3, y = 1", "x = 1, y = 5", "x = −2, y = 11"],
+  lambda: next(f"x = {x}, y = {y}" for x in range(-10, 11) for y in range(-20, 21) if 2 * x + y == 7 and x - 2 * y == -4))
+
+T = "quadratics"
+q(f"test-{T}-1", T, 2, "Solve x² − 2x − 15 = 0.",
+  ["x = 5 or x = −3", "x = −5 or x = 3", "x = 15 or x = −1", "x = 3 or x = 5"],
+  lambda: "x = 5 or x = −3" if roots(1, -2, -15) == [-3, 5] else None)
+q(f"test-{T}-2", T, 3, "If α and β are the roots of x² − 7x + 10 = 0, find 1/α + 1/β.",
+  ["7/10", "10/7", "7", "17/10"], lambda: frac(sum(F(1) / F(round(r)) for r in roots(1, -7, 10))))
+
+T = "sequences-series"
+q(f"test-{T}-1", T, 2, "Find the 8th term of the arithmetic progression −5, −2, 1, …",
+  ["16", "19", "13", "−26"], lambda: str(-5 + 7 * 3))
+q(f"test-{T}-2", T, 3, "The sum of the first n terms of an arithmetic progression is n(3n + 1). Find the 5th term.",
+  ["28", "80", "16", "52"], lambda: str(5 * (3 * 5 + 1) - 4 * (3 * 4 + 1)))
+
+T = "geometry-mensuration"
+q(f"test-{T}-1", T, 2, "Find the area of a circle of diameter 14 cm. [Take π = 22/7]",
+  ["154 cm²", "616 cm²", "44 cm²", "308 cm²"], lambda: f"{frac(PI * 7 * 7)} cm²")
+q(f"test-{T}-2", T, 3, "A cone has base radius 7 cm and height 24 cm. Find its curved surface area. [Take π = 22/7]",
+  ["550 cm²", "528 cm²", "1232 cm²", "704 cm²"], lambda: f"{frac(PI * 7 * math.isqrt(7**2 + 24**2))} cm²")
+
+T = "trigonometry"
+q(f"test-{T}-1", T, 2, "If cos θ = 5/13 and θ is acute, find tan θ.",
+  ["12/5", "5/12", "12/13", "13/12"], lambda: "12/5" if math.isclose(math.tan(math.acos(5 / 13)), 12 / 5) else None)
+q(f"test-{T}-2", T, 3, "From the top of a cliff 50 m high, the angle of depression of a boat is 30°. How far is the boat from the foot of the cliff?",
+  ["50√3 m", "50/√3 m", "100 m", "25 m"], lambda: "50√3 m" if math.isclose(50 / math.tan(d(30)), 50 * math.sqrt(3)) else None)
+
+T = "statistics-probability"
+q(f"test-{T}-1", T, 2, "Find the median of 3, 8, 5, 9, 6 and 10.",
+  ["7", "6", "8", "6.5"], lambda: str(round(sum(sorted([3, 8, 5, 9, 6, 10])[2:4]) / 2)))
+q(f"test-{T}-2", T, 3, "Two fair dice are thrown. Find the probability that the sum of the scores is 8.",
+  ["5/36", "1/6", "1/9", "2/9"], lambda: frac(F(sum(1 for a in range(1, 7) for b in range(1, 7) if a + b == 8), 36)))
+
 # ---------------- verification against seed-data.ts
 
 SEED = Path(__file__).with_name("seed-data.ts")

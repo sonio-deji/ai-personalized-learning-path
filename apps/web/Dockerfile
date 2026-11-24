@@ -5,6 +5,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
+# Patient downloads for slow or unreliable connections: longer timeouts, more retries,
+# fewer parallel sockets. Only affects the install step.
+ENV npm_config_fetch_timeout=600000 npm_config_fetch_retries=8 \
+    npm_config_fetch_retry_mintimeout=20000 npm_config_fetch_retry_maxtimeout=120000 \
+    npm_config_maxsockets=4
 RUN npm ci --workspace @plp/web
 COPY apps/web apps/web
 RUN npm run build --workspace @plp/web

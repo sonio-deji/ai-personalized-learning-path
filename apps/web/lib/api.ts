@@ -39,3 +39,7 @@ export type Feedback = {
   correct: boolean;
   question: { id: string; stem: string; topic: { name: string }; answer: string; answerText: string };
 };
+
+export type Stage = "pre_test" | "practice" | "post_test" | "survey" | "finished";
+
+export type TestItems = { kind: "pre" | "post"; items: { id: string; stem: string; options: Record<string, string> }[] };

@@ -160,3 +160,13 @@ progress {
   text-align: right;
   color: #555;
 }
+
+.test-item {
+  border-top: 1px solid #ddd;
+  padding-top: 0.75rem;
+}
+
+.scale {
+  display: flex;
+  flex-direction: column;
+}

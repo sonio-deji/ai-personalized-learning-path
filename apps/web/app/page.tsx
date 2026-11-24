@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUserId } from "@/lib/session";
+import { getStage, STAGE_PATH } from "@/lib/stage";
 import { login } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +12,17 @@ const ERRORS: Record<string, string> = {
 };
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  if (await getUserId()) redirect("/practice");
   const { error } = await searchParams;
+  const userId = await getUserId();
+  if (userId) {
+    const stage = await getStage(userId);
+    if (stage) redirect(STAGE_PATH[stage]);
+    return (
+      <main>
+        <p role="alert" className="error">The server is not responding. Please refresh the page in a moment.</p>
+      </main>
+    );
+  }
 
   return (
     <main>

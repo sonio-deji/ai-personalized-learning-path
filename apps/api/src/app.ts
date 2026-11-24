@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { prisma } from "./db.js";
 import { registerPracticeRoutes } from "./practice.js";
+import { registerStudyRoutes } from "./study/routes.js";
 
 const modelUrl = process.env.MODEL_URL ?? "http://127.0.0.1:8000";
 
@@ -42,12 +43,13 @@ export function buildApp() {
   app.get("/topics", async () => {
     const topics = await prisma.topic.findMany({
       orderBy: { curriculumOrder: "asc" },
-      include: { _count: { select: { questions: true } } },
+      include: { _count: { select: { questions: { where: { isTest: false } } } } },
     });
     return topics.map(({ _count, ...topic }) => ({ ...topic, questionCount: _count.questions }));
   });
 
   registerPracticeRoutes(app);
+  registerStudyRoutes(app);
 
   app.addHook("onClose", () => prisma.$disconnect());
   return app;

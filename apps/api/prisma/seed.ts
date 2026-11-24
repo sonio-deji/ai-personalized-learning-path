@@ -1,5 +1,5 @@
 import { prisma } from "../src/db.js";
-import { questions, topics } from "./seed-data.js";
+import { questions, testQuestions, topics } from "./seed-data.js";
 
 // Runs on every API start, so it must be repeatable. It updates seeded rows in place
 // and never deletes, so attempts are safe.
@@ -17,12 +17,17 @@ try {
       await tx.topic.upsert({ where: { id }, create: { id, ...data }, update: data });
     }
 
-    for (const { id, ...data } of questions) {
+    // isTest is written explicitly, so moving a question between the lists takes effect.
+    const all = [
+      ...questions.map((q) => ({ ...q, isTest: false })),
+      ...testQuestions.map((q) => ({ ...q, isTest: true })),
+    ];
+    for (const { id, ...data } of all) {
       await tx.question.upsert({ where: { id }, create: { id, ...data }, update: data });
     }
   }, { timeout: 30_000 });
 
-  console.log(`Seeded ${topics.length} topics and ${questions.length} questions`);
+  console.log(`Seeded ${topics.length} topics, ${questions.length} practice and ${testQuestions.length} test questions`);
 } finally {
   await prisma.$disconnect();
 }

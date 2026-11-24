@@ -1,12 +1,14 @@
+import { randomInt } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "./db.js";
 import type { Condition } from "./generated/prisma/enums.js";
 import { bktTopics, bktUpdate, dktPredict, ModelUnavailableError, priorFor } from "./model.js";
 import { nextFixedQuestion } from "./policy/fixed.js";
 import { DEFAULT_MIN_ANSWERS, MASTERY_THRESHOLD, nextPersonalisedQuestion } from "./policy/personalised.js";
+import { BLOCK_SIZE, nextInBlock } from "./study/pure.js";
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-type Db = typeof prisma | Tx;
+export type Db = typeof prisma | Tx;
 
 const perTopic = Number(process.env.FIXED_QUESTIONS_PER_TOPIC ?? 5);
 if (!Number.isInteger(perTopic) || perTopic < 1) {
@@ -19,9 +21,30 @@ if (!Number.isInteger(minAnswers) || minAnswers < 0) {
   throw new Error("PERSONALISED_MIN_ANSWERS must be a non-negative integer");
 }
 
-const newUserCondition = (process.env.NEW_USER_CONDITION ?? "fixed") as Condition;
-if (newUserCondition !== "fixed" && newUserCondition !== "personalised") {
-  throw new Error("NEW_USER_CONDITION must be 'fixed' or 'personalised'");
+// random (the pilot): balanced blocks of 4. fixed / personalised force a condition (development).
+const newUserCondition = process.env.NEW_USER_CONDITION ?? "random";
+if (!["random", "fixed", "personalised"].includes(newUserCondition)) {
+  throw new Error("NEW_USER_CONDITION must be 'random', 'fixed' or 'personalised'");
+}
+
+// Any fixed number: it only names the lock that serialises sign-ups.
+const SIGNUP_LOCK = 81_726_354;
+
+/** Condition for the next new participant. Call inside the sign-up lock. */
+async function assignCondition(tx: Tx): Promise<Condition> {
+  if (newUserCondition !== "random") return newUserCondition as Condition;
+  const n = await tx.user.count();
+  const inBlock = await tx.user.findMany({
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    skip: n - (n % BLOCK_SIZE),
+    select: { condition: true },
+  });
+  return nextInBlock(inBlock.map((u) => u.condition), randomInt);
+}
+
+/** True once the pre-test is submitted; practice is only open after it. */
+export async function preTestDone(db: Db, userId: string) {
+  return (await db.test.count({ where: { userId, kind: "pre" } })) > 0;
 }
 
 // Letters, digits and hyphens, e.g. P017. Stored upper-case so "p017" logs in too.
@@ -40,11 +63,11 @@ async function masteryMap(db: Db, userId: string, topicIds: string[]) {
   return new Map(topicIds.map((id) => [id, stored.get(id) ?? priorFor(params, id)]));
 }
 
-/** The current question for a user under their condition, plus progress. */
-async function currentQuestion(db: Db, userId: string, condition: Condition) {
+/** The current practice question for a user under their condition, plus progress. */
+export async function currentQuestion(db: Db, userId: string, condition: Condition) {
   const [topics, questions, attempts] = await Promise.all([
     db.topic.findMany(),
-    db.question.findMany({ include: { topic: true } }),
+    db.question.findMany({ where: { isTest: false }, include: { topic: true } }),
     db.attempt.findMany({ where: { userId }, select: { questionId: true } }),
   ]);
   const attempted = new Set(attempts.map((a) => a.questionId));
@@ -99,12 +122,12 @@ export function registerPracticeRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "consent_required" });
       }
 
-      // upsert, not create, so two first logins with the same code can't both fail.
-      const user = await prisma.user.upsert({
-        where: { code },
-        update: {},
-        // Week 8 replaces this with random assignment between 'personalised' and 'fixed'.
-        create: { code, condition: newUserCondition, consent: true },
+      // The lock serialises sign-ups, so two at once can't take the same slot in a block.
+      const user = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SIGNUP_LOCK})`;
+        const again = await tx.user.findUnique({ where: { code } });
+        if (again) return again;
+        return tx.user.create({ data: { code, condition: await assignCondition(tx), consent: true } });
       });
       return { userId: user.id, created: true };
     },
@@ -116,6 +139,7 @@ export function registerPracticeRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const user = await prisma.user.findUnique({ where: { id: req.params.userId } });
       if (!user) return reply.code(404).send({ error: "user_not_found" });
+      if (!(await preTestDone(prisma, user.id))) return reply.code(409).send({ error: "pre_test_required" });
 
       const { question, progress } = await currentQuestion(prisma, user.id, user.condition);
       if (!question) return { done: true, progress };
@@ -175,6 +199,7 @@ export function registerPracticeRoutes(app: FastifyInstance) {
         const locked = await tx.$queryRaw<{ condition: Condition }[]>`
           SELECT condition FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
         if (locked.length === 0) return reply.code(404).send({ error: "user_not_found" });
+        if (!(await preTestDone(tx, userId))) return reply.code(409).send({ error: "pre_test_required" });
 
         // Only the question the policy is currently showing may be answered.
         const { question } = await currentQuestion(tx, userId, locked[0].condition);

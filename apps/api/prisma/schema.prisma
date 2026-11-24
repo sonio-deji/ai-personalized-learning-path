@@ -58,6 +58,8 @@ model Question {
   answer     String // an option key. Never send this to the student before they answer.
   source     String
   difficulty Int // 1 easy, 2 medium, 3 hard
+  // Pre/post-test item: never used in practice (seed-data.ts testQuestions).
+  isTest     Boolean @default(false) @map("is_test")
 
   topic    Topic     @relation(fields: [topicId], references: [id], onDelete: Restrict)
   attempts Attempt[]

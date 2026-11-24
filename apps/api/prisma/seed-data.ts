@@ -339,3 +339,87 @@ export const questions = [
     "In how many ways can 3 prefects be chosen from 8 students?",
     ["336", "24", "11", "56"], "D"),
 ];
+
+// Pre- and post-test items: the same 20 both times (2 per topic), never shown in practice,
+// so the tests measure learning rather than memory of practice questions.
+export const testQuestions = [
+  // number-bases
+  question("test-number-bases-1", "number-bases", 2,
+    "Convert 1011011₂ to base ten.",
+    ["91", "93", "45", "182"], "A"),
+  question("test-number-bases-2", "number-bases", 3,
+    "Find n if 31ₙ = 25 (base ten).",
+    ["7", "8", "6", "9"], "B"),
+
+  // fractions-percentages
+  question("test-fractions-percentages-1", "fractions-percentages", 2,
+    "A shirt marked ₦6,000 is sold at a discount of 15%. Find the selling price.",
+    ["₦900", "₦5,850", "₦5,100", "₦6,900"], "C"),
+  question("test-fractions-percentages-2", "fractions-percentages", 3,
+    "Musa and Ngozi share a sum of money in the ratio 5 : 3. Musa gets ₦1,200 more than Ngozi. Find the sum shared.",
+    ["₦3,000", "₦1,800", "₦9,600", "₦4,800"], "D"),
+
+  // indices-logs-surds
+  question("test-indices-logs-surds-1", "indices-logs-surds", 2,
+    "Simplify (8^(1/3) × 16^(1/2)) ÷ 2³.",
+    ["1", "2", "1/2", "4"], "A"),
+  question("test-indices-logs-surds-2", "indices-logs-surds", 3,
+    "Solve log₂(x + 3) = 4.",
+    ["5", "13", "1", "61"], "B"),
+
+  // sets
+  question("test-sets-1", "sets", 2,
+    "In a class, 18 students offer French, 22 offer Igbo, 7 offer both and 5 offer neither. How many students are in the class?",
+    ["52", "45", "38", "33"], "C"),
+  question("test-sets-2", "sets", 3,
+    "If n(U) = 50, n(A) = 30, n(B) = 25 and n(A ∩ B) = 12, find n(A′ ∩ B′).",
+    ["12", "43", "5", "7"], "D"),
+
+  // linear-equations
+  question("test-linear-equations-1", "linear-equations", 2,
+    "Solve 4(x − 2) − 3(x + 1) = 5.",
+    ["16", "6", "−6", "4"], "A"),
+  question("test-linear-equations-2", "linear-equations", 3,
+    "Solve the simultaneous equations 2x + y = 7 and x − 2y = −4.",
+    ["x = 3, y = 1", "x = 2, y = 3", "x = 1, y = 5", "x = −2, y = 11"], "B"),
+
+  // quadratics
+  question("test-quadratics-1", "quadratics", 2,
+    "Solve x² − 2x − 15 = 0.",
+    ["x = −5 or x = 3", "x = 15 or x = −1", "x = 5 or x = −3", "x = 3 or x = 5"], "C"),
+  question("test-quadratics-2", "quadratics", 3,
+    "If α and β are the roots of x² − 7x + 10 = 0, find 1/α + 1/β.",
+    ["10/7", "7", "17/10", "7/10"], "D"),
+
+  // sequences-series
+  question("test-sequences-series-1", "sequences-series", 2,
+    "Find the 8th term of the arithmetic progression −5, −2, 1, …",
+    ["16", "19", "13", "−26"], "A"),
+  question("test-sequences-series-2", "sequences-series", 3,
+    "The sum of the first n terms of an arithmetic progression is n(3n + 1). Find the 5th term.",
+    ["80", "28", "16", "52"], "B"),
+
+  // geometry-mensuration
+  question("test-geometry-mensuration-1", "geometry-mensuration", 2,
+    "Find the area of a circle of diameter 14 cm. [Take π = 22/7]",
+    ["616 cm²", "44 cm²", "154 cm²", "308 cm²"], "C"),
+  question("test-geometry-mensuration-2", "geometry-mensuration", 3,
+    "A cone has base radius 7 cm and height 24 cm. Find its curved surface area. [Take π = 22/7]",
+    ["528 cm²", "1232 cm²", "704 cm²", "550 cm²"], "D"),
+
+  // trigonometry
+  question("test-trigonometry-1", "trigonometry", 2,
+    "If cos θ = 5/13 and θ is acute, find tan θ.",
+    ["12/5", "5/12", "12/13", "13/12"], "A"),
+  question("test-trigonometry-2", "trigonometry", 3,
+    "From the top of a cliff 50 m high, the angle of depression of a boat is 30°. How far is the boat from the foot of the cliff?",
+    ["50/√3 m", "50√3 m", "100 m", "25 m"], "B"),
+
+  // statistics-probability
+  question("test-statistics-probability-1", "statistics-probability", 2,
+    "Find the median of 3, 8, 5, 9, 6 and 10.",
+    ["6", "8", "7", "6.5"], "C"),
+  question("test-statistics-probability-2", "statistics-probability", 3,
+    "Two fair dice are thrown. Find the probability that the sum of the scores is 8.",
+    ["1/6", "1/9", "2/9", "5/36"], "D"),
+];
