@@ -103,7 +103,6 @@ async function getMastery(userId: string) {
 }
 
 function progressLabel({ answered, total }: Progress) {
-  if (total === null) return `Question ${answered + 1}`;
   return `Question ${Math.min(answered + 1, total)} of ${total}`;
 }
 
@@ -124,7 +123,7 @@ function Shell({
           <button type="submit" className="link">Log out</button>
         </form>
       </header>
-      {progress?.total != null && <progress value={progress.answered} max={progress.total} />}
+      {progress && <progress value={progress.answered} max={progress.total} />}
       {children}
       {mastery && <MasteryBars mastery={mastery} />}
     </main>

@@ -48,8 +48,9 @@ describe("nextPersonalisedQuestion", () => {
     assert.equal(next(["a-1", "a-2"], { ...low, a: 0.5 }), "b-1");
   });
 
-  it("returns null when every topic is mastered or exhausted", () => {
-    assert.equal(next(["c-1"], { a: 0.96, b: 0.99, c: 0.4 }), null);
+  it("reviews when every topic is mastered or exhausted", () => {
+    // a and b mastered, c used up: review the lowest p_known topic that has questions left (a)
+    assert.equal(next(["c-1"], { a: 0.96, b: 0.99, c: 0.4 }), "a-1");
   });
 
   it("treats a topic missing from the mastery map as not mastered", () => {
@@ -85,5 +86,26 @@ describe("nextPersonalisedQuestion: minimum answers before skipping", () => {
   it("moves on from a topic with fewer questions than minAnswers once they run out", () => {
     assert.equal(next(["c-1"], { a: 0.99, b: 0.99, c: 0.99 }, 3), "a-1");
     assert.equal(next(["a-1", "a-2", "b-1", "b-2", "c-1"], { a: 0.99, b: 0.99, c: 0.99 }, 3), null);
+  });
+});
+
+describe("nextPersonalisedQuestion: review after everything is mastered", () => {
+  const all = { a: 0.99, b: 0.97, c: 0.98 };
+
+  it("picks the lowest p_known topic with questions left", () => {
+    // all mastered (minAnswers 0): b has the lowest p_known
+    assert.equal(next([], all), "b-1");
+  });
+
+  it("skips review topics that are used up", () => {
+    assert.equal(next(["b-1", "b-2"], all), "c-1");
+  });
+
+  it("keeps curriculum order for equal p_known", () => {
+    assert.equal(next([], { a: 0.97, b: 0.97, c: 0.97 }), "a-1");
+  });
+
+  it("returns null only when no question is left", () => {
+    assert.equal(next(["a-1", "a-2", "b-1", "b-2", "c-1"], all), null);
   });
 });

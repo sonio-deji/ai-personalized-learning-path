@@ -8,6 +8,11 @@
 //
 // If a topic runs out of questions before it is mastered, the student moves on to the
 // next unmastered topic rather than getting stuck. Questions are never repeated.
+//
+// Practice has a fixed length for both conditions (PRACTICE_LENGTH, enforced by the caller),
+// so the comparison is about which questions are chosen, not how many. If every topic is
+// mastered or used up before then, practice continues on the topic with the lowest p_known
+// that still has questions (review).
 
 import type { PolicyQuestion, PolicyTopic } from "./fixed.js";
 
@@ -25,17 +30,26 @@ export function nextPersonalisedQuestion<Q extends PolicyQuestion>(
   { threshold = MASTERY_THRESHOLD, minAnswers = DEFAULT_MIN_ANSWERS }: PersonalisedOptions = {},
 ): Q | null {
   const ordered = [...topics].sort((a, b) => a.curriculumOrder - b.curriculumOrder);
+  const easiestLeft = (topicId: string) =>
+    questions
+      .filter((q) => q.topicId === topicId && !attemptedIds.has(q.id))
+      .sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id))[0];
 
   for (const topic of ordered) {
-    const inTopic = questions.filter((q) => q.topicId === topic.id);
-    const answered = inTopic.filter((q) => attemptedIds.has(q.id)).length;
+    const answered = questions.filter((q) => q.topicId === topic.id && attemptedIds.has(q.id)).length;
     const mastered = (mastery.get(topic.id) ?? 0) >= threshold && answered >= minAnswers;
     if (mastered) continue;
 
-    const next = inTopic
-      .filter((q) => !attemptedIds.has(q.id))
-      .sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id))[0];
+    const next = easiestLeft(topic.id);
     if (next) return next;
   }
-  return null; // every topic mastered or out of questions
+
+  // Review: every topic is mastered or used up. Lowest p_known first, then curriculum order
+  // (the sort is stable, so ties keep curriculum order).
+  const byMastery = [...ordered].sort((a, b) => (mastery.get(a.id) ?? 0) - (mastery.get(b.id) ?? 0));
+  for (const topic of byMastery) {
+    const next = easiestLeft(topic.id);
+    if (next) return next;
+  }
+  return null; // no unanswered questions left at all
 }

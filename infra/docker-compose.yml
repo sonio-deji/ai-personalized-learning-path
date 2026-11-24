@@ -51,6 +51,8 @@ services:
       # Condition for new participants: random (balanced blocks of 4, for the pilot), or
       # fixed / personalised to force one while developing.
       NEW_USER_CONDITION: ${NEW_USER_CONDITION:-random}
+      # Practice questions per participant, the same in both conditions (a multiple of 10 topics).
+      PRACTICE_LENGTH: ${PRACTICE_LENGTH:-30}
       # Answers needed on a topic before the personalised path may skip it as mastered.
       PERSONALISED_MIN_ANSWERS: ${PERSONALISED_MIN_ANSWERS:-2}
     ports:

@@ -21,8 +21,8 @@ export async function api<T>(path: string, init?: { method?: string; body?: unkn
   }
 }
 
-// total is null on a personalised path, whose length isn't known in advance.
-export type Progress = { answered: number; total: number | null };
+// total is PRACTICE_LENGTH, the same in both conditions.
+export type Progress = { answered: number; total: number };
 
 export type TopicMastery = { topicId: string; name: string; pKnown: number; mastered: boolean };
 

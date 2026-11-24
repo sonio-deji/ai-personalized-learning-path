@@ -60,8 +60,9 @@ Each participant goes through the study in this order; the home page always send
 current step, and the API refuses steps out of order:
 
 1. **Pre-test**: 20 items (2 per topic, `testQuestions` in `seed-data.ts`), no feedback.
-2. **Practice**: one question at a time with feedback and mastery bars, under their condition.
-3. **Post-test**: the same 20 items, opened as soon as the participant's practice set ends.
+2. **Practice**: `PRACTICE_LENGTH` questions (default 30) in both conditions, one at a time with
+   feedback and mastery bars. Only which questions are asked differs between the conditions.
+3. **Post-test**: the same 20 items, opened after the last practice question.
 4. **SUS survey**: the ten standard System Usability Scale statements ("system" → "app").
 
 The test items are never used in practice, so the tests measure learning rather than memory of
@@ -78,16 +79,17 @@ A participant's condition is set when they first log in, from `NEW_USER_CONDITIO
 
 What the conditions do in practice:
 
-- `fixed`: topics in curriculum order, up to `FIXED_QUESTIONS_PER_TOPIC` questions each
-  (default 5), easiest first.
+- `fixed`: topics in curriculum order, `PRACTICE_LENGTH` / 10 questions each (3 by default),
+  easiest first.
 - `personalised`: the earliest topic not yet mastered, easiest unanswered question first. A
   topic counts as mastered when BKT p_known ≥ 0.95 **and** the student has answered at least
   `PERSONALISED_MIN_ANSWERS` questions on it (default 2), so one lucky guess can't skip a topic.
-  Mastered topics are skipped; a topic that runs out of questions is left.
+  Mastered topics are skipped; a topic that runs out of questions is left. If every topic is
+  mastered or used up before `PRACTICE_LENGTH`, practice continues on the topic with the lowest
+  p_known that still has questions.
 
-Because the post-test opens when practice ends, personalised participants (whose path is
-usually shorter) tend to sit it after fewer questions than fixed-order ones. Record and report
-the number of practice answers per participant (`attempts.csv`) alongside the test gains.
+Both conditions get exactly the same number of practice questions, so a difference in test
+gains reflects which questions were chosen, not how much practice there was.
 
 The service status page is at http://localhost:3000/status.
 

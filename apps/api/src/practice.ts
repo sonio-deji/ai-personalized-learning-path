@@ -10,9 +10,13 @@ import { BLOCK_SIZE, nextInBlock } from "./study/pure.js";
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 export type Db = typeof prisma | Tx;
 
-const perTopic = Number(process.env.FIXED_QUESTIONS_PER_TOPIC ?? 5);
-if (!Number.isInteger(perTopic) || perTopic < 1) {
-  throw new Error("FIXED_QUESTIONS_PER_TOPIC must be a positive integer");
+// Practice questions per participant, the same in both conditions, so the comparison is about
+// which questions are chosen, not how many. The post-test opens after the last one.
+// Fixed order gives PRACTICE_LENGTH / (number of topics) per topic, rounded up; use a multiple
+// of the number of topics (10) so every topic gets the same share.
+export const practiceLength = Number(process.env.PRACTICE_LENGTH ?? 30);
+if (!Number.isInteger(practiceLength) || practiceLength < 1) {
+  throw new Error("PRACTICE_LENGTH must be a positive integer");
 }
 
 // Answers needed on a topic before the personalised path may skip it as mastered.
@@ -71,21 +75,16 @@ export async function currentQuestion(db: Db, userId: string, condition: Conditi
     db.attempt.findMany({ where: { userId }, select: { questionId: true } }),
   ]);
   const attempted = new Set(attempts.map((a) => a.questionId));
+  const progress = { answered: attempts.length, total: practiceLength };
+  if (attempts.length >= practiceLength) return { question: null, progress }; // practice finished
 
   if (condition === "personalised") {
     const mastery = await masteryMap(db, userId, topics.map((t) => t.id));
-    const question = nextPersonalisedQuestion(topics, questions, attempted, mastery, { minAnswers });
-    // The length of a personalised path isn't known in advance.
-    return { question, progress: { answered: attempts.length, total: null } };
+    return { question: nextPersonalisedQuestion(topics, questions, attempted, mastery, { minAnswers }), progress };
   }
 
-  // Total length of the fixed sequence, for the progress indicator.
-  const total = topics.reduce(
-    (sum, t) => sum + Math.min(perTopic, questions.filter((q) => q.topicId === t.id).length),
-    0,
-  );
-  const question = nextFixedQuestion(topics, questions, attempted, perTopic);
-  return { question, progress: { answered: attempts.length, total } };
+  const perTopic = Math.ceil(practiceLength / Math.max(topics.length, 1));
+  return { question: nextFixedQuestion(topics, questions, attempted, perTopic), progress };
 }
 
 export function registerPracticeRoutes(app: FastifyInstance) {
