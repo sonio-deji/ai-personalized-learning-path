@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_MIN_ANSWERS, MASTERY_THRESHOLD, nextPersonalisedQuestion } from "./personalised.js";
+import { DEFAULT_MAX_PER_TOPIC, DEFAULT_MIN_ANSWERS, MASTERY_THRESHOLD, nextPersonalisedQuestion } from "./personalised.js";
 
 const topics = [
   { id: "b", curriculumOrder: 2 },
@@ -107,5 +107,84 @@ describe("nextPersonalisedQuestion: review after everything is mastered", () => 
 
   it("returns null only when no question is left", () => {
     assert.equal(next(["a-1", "a-2", "b-1", "b-2", "c-1"], all), null);
+  });
+});
+
+describe("nextPersonalisedQuestion: at most maxPerTopic questions per topic in the first pass", () => {
+  // Topic h has 8 questions; k and m have 3 each.
+  const capTopics = [
+    { id: "h", curriculumOrder: 1 },
+    { id: "k", curriculumOrder: 2 },
+    { id: "m", curriculumOrder: 3 },
+  ];
+  const capQuestions = [
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `h-${i}`, topicId: "h", difficulty: 1 })),
+    ...Array.from({ length: 3 }, (_, i) => ({ id: `k-${i}`, topicId: "k", difficulty: 1 })),
+    ...Array.from({ length: 3 }, (_, i) => ({ id: `m-${i}`, topicId: "m", difficulty: 1 })),
+  ];
+  const weak = new Map([["h", 0.2], ["k", 0.3], ["m", 0.4]]);
+  const nextCap = (attempted: string[], maxPerTopic?: number) =>
+    nextPersonalisedQuestion(capTopics, capQuestions, new Set(attempted), weak, { minAnswers: 0, maxPerTopic })
+      ?.id ?? null;
+  const h = (n: number) => Array.from({ length: n }, (_, i) => `h-${i}`);
+
+  it("defaults to 5", () => {
+    assert.equal(DEFAULT_MAX_PER_TOPIC, 5);
+    assert.equal(nextCap(h(4)), "h-4");
+    assert.equal(nextCap(h(5)), "k-0");
+  });
+
+  it("moves on from an unmastered topic after the cap", () => {
+    assert.equal(nextCap(h(3), 3), "k-0");
+  });
+
+  it("reaches every topic before returning to a capped one", () => {
+    assert.equal(nextCap([...h(5), "k-0", "k-1", "k-2"]), "m-0");
+  });
+
+  it("returns to the weakest topic in review once every topic has had its turn", () => {
+    const all = [...h(5), "k-0", "k-1", "k-2", "m-0", "m-1", "m-2"];
+    assert.equal(nextCap(all), "h-5"); // h has the lowest p_known and questions left
+  });
+});
+
+describe("nextPersonalisedQuestion: leaves room for every topic within the practice length", () => {
+  // Three weak topics with plenty of questions; minAnswers 2, so 2 are reserved per topic ahead.
+  const t3 = [
+    { id: "p", curriculumOrder: 1 },
+    { id: "q", curriculumOrder: 2 },
+    { id: "r", curriculumOrder: 3 },
+  ];
+  const qs = ["p", "q", "r"].flatMap((t) =>
+    Array.from({ length: 8 }, (_, i) => ({ id: `${t}-${i}`, topicId: t, difficulty: 1 })),
+  );
+  const weakAll = new Map([["p", 0.2], ["q", 0.2], ["r", 0.2]]);
+  const run = (length: number) => {
+    const asked: string[] = [];
+    for (let n = 0; n < length; n++) {
+      const q = nextPersonalisedQuestion(t3, qs, new Set(asked), weakAll, { remaining: length - n });
+      if (!q) break;
+      asked.push(q.id);
+    }
+    return asked.map((id) => id[0]).join("");
+  };
+
+  it("gives a weak student every topic, at least 2 each, in a short practice", () => {
+    assert.equal(run(6), "ppqqrr");
+    assert.equal(run(8), "ppppqqrr");
+  });
+
+  it("uses up to maxPerTopic when there is room", () => {
+    assert.equal(run(15), "pppppqqqqqrrrrr");
+  });
+
+  it("stays within the cap and the budget together", () => {
+    assert.equal(run(10), "pppppqqqrr");
+  });
+
+  it("starts a topic even when the budget is short, rather than skipping it", () => {
+    // 3 left, 4 owed to q and r: p is unvisited, so it still gets its first question
+    const q = nextPersonalisedQuestion(t3, qs, new Set(), weakAll, { remaining: 3 });
+    assert.equal(q?.id, "p-0");
   });
 });

@@ -96,10 +96,12 @@ export function registerStudyRoutes(app: FastifyInstance) {
       const { userId, kind } = req.params;
       const { answers, durationMs } = req.body;
 
-      return prisma.$transaction(async (tx) => {
-        if (!(await lockUser(tx, userId))) return reply.code(404).send({ error: "user_not_found" });
+      // Respond only after the transaction commits: replying inside it would let the client's
+      // next request run before the data is visible.
+      const result = await prisma.$transaction(async (tx) => {
+        if (!(await lockUser(tx, userId))) return { status: 404, body: { error: "user_not_found" } };
         const stage = await stageFor(tx, userId);
-        if (stage !== STAGE_FOR_TEST[kind]) return reply.code(409).send({ error: "wrong_stage", stage });
+        if (stage !== STAGE_FOR_TEST[kind]) return { status: 409, body: { error: "wrong_stage", stage } };
 
         const items = await tx.question.findMany({
           where: { isTest: true },
@@ -114,8 +116,9 @@ export function registerStudyRoutes(app: FastifyInstance) {
         const score = responses.filter((r) => r.correct).length;
         await tx.test.create({ data: { userId, kind, score, items: { durationMs, responses } } });
         // No score is returned: students get no feedback on the tests.
-        return reply.code(201).send({ submitted: true });
+        return { status: 201, body: { submitted: true } };
       });
+      return reply.code(result.status).send(result.body);
     },
   );
 
@@ -138,13 +141,16 @@ export function registerStudyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { userId } = req.params;
       susScore(req.body.responses); // validates; the score itself is computed at export
-      return prisma.$transaction(async (tx) => {
-        if (!(await lockUser(tx, userId))) return reply.code(404).send({ error: "user_not_found" });
+      // Respond only after the transaction commits: replying inside it would let the client's
+      // next request run before the data is visible.
+      const result = await prisma.$transaction(async (tx) => {
+        if (!(await lockUser(tx, userId))) return { status: 404, body: { error: "user_not_found" } };
         const stage = await stageFor(tx, userId);
-        if (stage !== "survey") return reply.code(409).send({ error: "wrong_stage", stage });
+        if (stage !== "survey") return { status: 409, body: { error: "wrong_stage", stage } };
         await tx.susResponse.create({ data: { userId, responses: req.body.responses } });
-        return reply.code(201).send({ submitted: true });
+        return { status: 201, body: { submitted: true } };
       });
+      return reply.code(result.status).send(result.body);
     },
   );
 }

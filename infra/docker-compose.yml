@@ -55,6 +55,8 @@ services:
       PRACTICE_LENGTH: ${PRACTICE_LENGTH:-30}
       # Answers needed on a topic before the personalised path may skip it as mastered.
       PERSONALISED_MIN_ANSWERS: ${PERSONALISED_MIN_ANSWERS:-2}
+      # Most questions on a topic before the personalised path moves on, mastered or not.
+      PERSONALISED_MAX_PER_TOPIC: ${PERSONALISED_MAX_PER_TOPIC:-5}
     ports:
       - "127.0.0.1:${API_PORT:-4000}:4000"
     depends_on:

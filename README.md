@@ -84,9 +84,11 @@ What the conditions do in practice:
 - `personalised`: the earliest topic not yet mastered, easiest unanswered question first. A
   topic counts as mastered when BKT p_known ≥ 0.95 **and** the student has answered at least
   `PERSONALISED_MIN_ANSWERS` questions on it (default 2), so one lucky guess can't skip a topic.
-  Mastered topics are skipped; a topic that runs out of questions is left. If every topic is
-  mastered or used up before `PRACTICE_LENGTH`, practice continues on the topic with the lowest
-  p_known that still has questions.
+  Mastered topics are skipped; a topic that runs out of questions is left. After
+  `PERSONALISED_MAX_PER_TOPIC` questions (default 5) the student moves on even if the topic isn't
+  mastered, so a weak student still reaches every topic within the practice length. Once every
+  topic has had its turn, practice continues on the topic with the lowest p_known that still
+  has questions.
 
 Both conditions get exactly the same number of practice questions, so a difference in test
 gains reflects which questions were chosen, not how much practice there was.

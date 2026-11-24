@@ -4,7 +4,12 @@ import { prisma } from "./db.js";
 import type { Condition } from "./generated/prisma/enums.js";
 import { bktTopics, bktUpdate, dktPredict, ModelUnavailableError, priorFor } from "./model.js";
 import { nextFixedQuestion } from "./policy/fixed.js";
-import { DEFAULT_MIN_ANSWERS, MASTERY_THRESHOLD, nextPersonalisedQuestion } from "./policy/personalised.js";
+import {
+  DEFAULT_MAX_PER_TOPIC,
+  DEFAULT_MIN_ANSWERS,
+  MASTERY_THRESHOLD,
+  nextPersonalisedQuestion,
+} from "./policy/personalised.js";
 import { BLOCK_SIZE, nextInBlock } from "./study/pure.js";
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -26,6 +31,12 @@ if (!Number.isInteger(minAnswers) || minAnswers < 0) {
 }
 
 // random (the pilot): balanced blocks of 4. fixed / personalised force a condition (development).
+// Questions on a topic before the personalised path moves on, mastered or not (first pass).
+const maxPerTopic = Number(process.env.PERSONALISED_MAX_PER_TOPIC ?? DEFAULT_MAX_PER_TOPIC);
+if (!Number.isInteger(maxPerTopic) || maxPerTopic < 1) {
+  throw new Error("PERSONALISED_MAX_PER_TOPIC must be a positive integer");
+}
+
 const newUserCondition = process.env.NEW_USER_CONDITION ?? "random";
 if (!["random", "fixed", "personalised"].includes(newUserCondition)) {
   throw new Error("NEW_USER_CONDITION must be 'random', 'fixed' or 'personalised'");
@@ -80,7 +91,11 @@ export async function currentQuestion(db: Db, userId: string, condition: Conditi
 
   if (condition === "personalised") {
     const mastery = await masteryMap(db, userId, topics.map((t) => t.id));
-    return { question: nextPersonalisedQuestion(topics, questions, attempted, mastery, { minAnswers }), progress };
+    return { question: nextPersonalisedQuestion(topics, questions, attempted, mastery, {
+      minAnswers,
+      maxPerTopic,
+      remaining: practiceLength - attempts.length,
+    }), progress };
   }
 
   const perTopic = Math.ceil(practiceLength / Math.max(topics.length, 1));
@@ -192,22 +207,24 @@ export function registerPracticeRoutes(app: FastifyInstance) {
       const { userId } = req.params;
       const { questionId, answer, responseTimeMs } = req.body;
 
-      return prisma.$transaction(async (tx) => {
+      // Respond only after the transaction commits: replying inside it would let the client's
+      // next request run before the data is visible.
+      const result = await prisma.$transaction(async (tx) => {
         // Lock the user's row so a double-click or a resubmitted form can't record two
         // attempts for the same question.
         const locked = await tx.$queryRaw<{ condition: Condition }[]>`
           SELECT condition FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
-        if (locked.length === 0) return reply.code(404).send({ error: "user_not_found" });
-        if (!(await preTestDone(tx, userId))) return reply.code(409).send({ error: "pre_test_required" });
+        if (locked.length === 0) return { status: 404, body: { error: "user_not_found" } };
+        if (!(await preTestDone(tx, userId))) return { status: 409, body: { error: "pre_test_required" } };
 
         // Only the question the policy is currently showing may be answered.
         const { question } = await currentQuestion(tx, userId, locked[0].condition);
         if (!question || question.id !== questionId) {
-          return reply.code(409).send({ error: "not_current_question" });
+          return { status: 409, body: { error: "not_current_question" } };
         }
 
         const options = question.options as Record<string, string>;
-        if (!(answer in options)) return reply.code(400).send({ error: "invalid_answer" });
+        if (!(answer in options)) return { status: 400, body: { error: "invalid_answer" } };
         const correct = answer === question.answer;
 
         // BKT and DKT run for both conditions, so every attempt has p_bkt and p_dkt for the AUC
@@ -239,8 +256,9 @@ export function registerPracticeRoutes(app: FastifyInstance) {
           update: { pKnown: bkt.p_known },
         });
 
-        return reply.code(201).send({ attemptId: attempt.id, correct });
+        return { status: 201, body: { attemptId: attempt.id, correct } };
       });
+      return reply.code(result.status).send(result.body);
     },
   );
 
